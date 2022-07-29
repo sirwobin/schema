@@ -24,6 +24,12 @@
 
 (defn type-of [x]
   #?(:clj (class x)
+     :org.babashka/nbb (cond
+                         (nil? x)     "null"    ; This case is not observed on nodejs, nil returns "object" but it is recognised in JS spec. Useful for explanations.
+                         (boolean? x) "boolean"
+                         (number? x)  "number"
+                         (string? x)  "string"
+                         :else        "object")
      :cljs (js* "typeof ~{}" x)))
 
 (defn fn-schema-bearer
@@ -48,16 +54,16 @@
       (symbol (str "a-" #?(:clj (.getName ^Class t) :cljs t))))))
 
 #?(:clj
-(defmacro char-map []
-  clojure.lang.Compiler/CHAR_MAP))
+   (defmacro char-map []
+     clojure.lang.Compiler/CHAR_MAP))
 
 #?(:clj
-(defn unmunge
-  "TODO: eventually use built in demunge in latest cljs."
-  [s]
-  (->> (char-map)
-       (sort-by #(- (count (second %))))
-       (reduce (fn [^String s [to from]] (string/replace s from (str to))) s))))
+   (defn unmunge
+     "TODO: eventually use built in demunge in latest cljs."
+     [s]
+     (->> (char-map)
+          (sort-by #(- (count (second %))))
+          (reduce (fn [^String s [to from]] (string/replace s from (str to))) s))))
 
 (defn fn-name
   "A meaningful name for a function that looks like its symbol, if applicable."
@@ -98,8 +104,8 @@
   (list (or (.-fail-explanation err) 'not) @(.-expectation-delay err)))
 
 #?(:clj ;; Validation errors print like forms that would return false
-(defmethod print-method ValidationError [err writer]
-  (print-method (validation-error-explain err) writer)))
+   (defmethod print-method ValidationError [err writer]
+     (print-method (validation-error-explain err) writer)))
 
 (defn make-ValidationError
   "for cljs sake (easier than normalizing imports in macros.clj)"
@@ -119,8 +125,8 @@
   (list 'named (.-error err) (.-name err)))
 
 #?(:clj ;; Validation errors print like forms that would return false
-(defmethod print-method NamedError [err writer]
-  (print-method (named-error-explain err) writer)))
+   (defmethod print-method NamedError [err writer]
+     (print-method (named-error-explain err) writer)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -144,30 +150,30 @@
 ;;; Registry for attaching schemas to classes, used for defn and defrecord
 
 #?(:clj
-(let [^java.util.Map +class-schemata+ (java.util.Collections/synchronizedMap (java.util.WeakHashMap.))]
-  (defn declare-class-schema!
-    "Globally set the schema for a class (above and beyond a simple instance? check).
+   (let [^java.util.Map +class-schemata+ (java.util.Collections/synchronizedMap (java.util.WeakHashMap.))]
+     (defn declare-class-schema!
+       "Globally set the schema for a class (above and beyond a simple instance? check).
    Use with care, i.e., only on classes that you control.  Also note that this
    schema only applies to instances of the concrete type passed, i.e.,
    (= (class x) klass), not (instance? klass x)."
-    [klass schema]
-    #?(:bb nil ;; fn identity is used as klass in bb
-       :default (assert (class? klass)
-                        (format* "Cannot declare class schema for non-class %s" (pr-str (class klass)))))
-    (.put +class-schemata+ klass schema))
+       [klass schema]
+       #?(:bb nil ;; fn identity is used as klass in bb
+          :default (assert (class? klass)
+                           (format* "Cannot declare class schema for non-class %s" (pr-str (class klass)))))
+       (.put +class-schemata+ klass schema))
 
-  (defn class-schema
-    "The last schema for a class set by declare-class-schema!, or nil."
-    [klass]
-    (.get +class-schemata+ klass))))
+     (defn class-schema
+       "The last schema for a class set by declare-class-schema!, or nil."
+       [klass]
+       (.get +class-schemata+ klass))))
 
 #?(:cljs
-(do
-  (defn declare-class-schema! [klass schema]
-    (gobject/set klass "schema$utils$schema" schema))
+   (do
+     (defn declare-class-schema! [klass schema]
+       (gobject/set klass "schema$utils$schema" schema))
 
-  (defn class-schema [klass]
-    (gobject/get klass "schema$utils$schema"))))
+     (defn class-schema [klass]
+       (gobject/get klass "schema$utils$schema"))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
